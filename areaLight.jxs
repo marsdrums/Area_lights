@@ -1,0 +1,76 @@
+<jittershader name="fill-flat-quads">
+	<description>Default Shader </description>
+	<param name="pos" type="vec3" state="POSITION" />
+	<param name="nor" type="vec3" state="NORMAL" />
+	<param name="M" type="mat4" state="WORLD_MATRIX" />
+	<param name="eye" type="vec3" state="CAMERA_POSITION" />
+	<param name="MVP" type="mat4" state="MODELVIEW_PROJECTION_MATRIX" />
+	<language name="glsl" version="1.5">
+		<bind param="pos" program="vp" />
+		<bind param="nor" program="vp" />
+		<bind param="M" program="vp" />
+		<bind param="MVP" program="vp" />
+		<bind param="eye" program="fp" />
+		<program name="vp" type="vertex">
+<![CDATA[
+#version 330 core
+uniform mat4 MVP, M;
+in vec3 pos, nor;
+
+out jit_PerVertex {
+	smooth vec3 nor;
+	smooth vec3 pos;
+} jit_out;
+
+void main() {	
+	gl_Position = MVP * vec4(pos, 1.);	
+	jit_out.nor = (M * vec4(nor, 0.)).xyz;
+	jit_out.pos = (M * vec4(pos, 1.)).xyz;
+}
+]]>
+		</program>
+		<program name="fp" type="fragment">
+<![CDATA[
+#version 330 core
+
+uniform vec3 eye;
+
+in jit_PerVertex {
+	smooth vec3 nor;
+	smooth vec3 pos;
+} jit_in;
+
+out vec4 col;
+
+vec4 SDFline( vec3 p, vec3 a, vec3 b)
+{
+  vec3 	pa 		= p - a, ba = b - a;
+  float h 		= clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+  float r 		= 0.0;
+  vec3 	hitPos 	= mix(a, b, vec3(h));
+  vec3 	ligDir 	= normalize(hitPos - p);
+  float d 		= length( pa - ba*h ) - r;
+  return 		vec4( ligDir, d );
+}
+
+void main() {
+
+	vec3	V 		= normalize(jit_in.pos - eye);
+	vec3   	ref 	= reflect(V, jit_in.nor);
+	vec3 	a 		= vec3(-1., 1., 0.);
+	vec3 	b 		= vec3(1., 1., 0.);
+	vec4 	lig 	= SDFline(jit_in.pos, a, b);
+	float 	att 	= 1./(1. + lig.w*lig.w);
+	float 	dif 	= max(dot(jit_in.nor, lig.xyz), 0.);
+	float	spe 	= max(dot(ref, lig.xyz), 0.);
+			spe 	= pow(spe, 100.);
+	vec3	ligCol 	= vec3(1.);
+			col.rgb = ligCol * (dif+spe)*att;
+
+			col.rgb = pow(col.rgb, vec3(1./2.2));
+			col.a 	= 1.;
+}	
+]]>
+		</program>
+	</language>
+</jittershader>
