@@ -48,25 +48,77 @@ vec4 SDFline( vec3 p, vec3 a, vec3 b)
   float h 		= clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
   float r 		= 0.0;
   vec3 	hitPos 	= mix(a, b, vec3(h));
-  vec3 	ligDir 	= normalize(hitPos - p);
   float d 		= length( pa - ba*h ) - r;
-  return 		vec4( ligDir, d );
+  return 		vec4( hitPos, d );
 }
+/*
+float SDFquad( vec3 p, vec3 a, vec3 b, vec3 c, vec3 d )
+{
+  vec3 ba = b - a; vec3 pa = p - a;
+  vec3 cb = c - b; vec3 pb = p - b;
+  vec3 dc = d - c; vec3 pc = p - c;
+  vec3 ad = a - d; vec3 pd = p - d;
+  vec3 nor = cross( ba, ad );
+
+  return sqrt(
+    (sign(dot(cross(ba,nor),pa)) +
+     sign(dot(cross(cb,nor),pb)) +
+     sign(dot(cross(dc,nor),pc)) +
+     sign(dot(cross(ad,nor),pd))<3.0)
+     ?
+     min( min( min(
+     dot2(ba*clamp(dot(ba,pa)/dot2(ba),0.0,1.0)-pa),
+     dot2(cb*clamp(dot(cb,pb)/dot2(cb),0.0,1.0)-pb) ),
+     dot2(dc*clamp(dot(dc,pc)/dot2(dc),0.0,1.0)-pc) ),
+     dot2(ad*clamp(dot(ad,pd)/dot2(ad),0.0,1.0)-pd) )
+     :
+     dot(nor,pa)*dot(nor,pa)/dot2(nor) );
+}
+*/
 
 void main() {
 
-	vec3	V 		= normalize(jit_in.pos - eye);
-	vec3   	ref 	= reflect(V, jit_in.nor);
-	vec3 	a 		= vec3(-1., 1., 0.);
-	vec3 	b 		= vec3(1., 1., 0.);
-	vec4 	lig 	= SDFline(jit_in.pos, a, b);
-	float 	att 	= 1./(1. + lig.w*lig.w);
-	float 	dif 	= max(dot(jit_in.nor, lig.xyz), 0.);
-	float	spe 	= max(dot(ref, lig.xyz), 0.);
-			spe 	= pow(spe, 100.);
-	vec3	ligCol 	= vec3(1.);
-			col.rgb = ligCol * (dif+spe)*att;
+	vec3 V 	= normalize(jit_in.pos - eye);
+	vec3 R 	= normalize(reflect(V, jit_in.nor));
+	vec3 a 	= vec3(-1., 1., 0.);
+	vec3 b 	= vec3(1., 1., 0.);
+	vec3 PA = jit_in.pos - a;
+	vec3 PB = jit_in.pos - b;
+	vec3 AB = b - a;
+	float la = length(PA);
+	float lb = length(PB);
+ 
+// Bisector theorem states that a / b = x / y, where c = x + y = length(AB)
+// Therefore x = c * a / (b + a). Note that c cancels out when normalizing AB
+ 
+float x = la / (lb + la);
+vec3 diffuseMostRepresentativePoint = a + AB * x;
 
+// If R is normalized, dot(R, R) = 1 and can be optimized away
+float t_num = dot(R, PA) * dot(AB, R) - dot(AB, PA);
+float t_denom = dot(AB, AB) - dot(AB, R) * dot(AB, R);
+float t = clamp(t_num / t_denom, 0., 1.);
+ 
+vec3 specularMostRepresentativePoint = a + AB * t;
+
+	//vec4 	lig 	= SDFline(jit_in.pos, a, b);
+	vec3    ligPos = diffuseMostRepresentativePoint;
+	float  	ligDis = length(ligPos - jit_in.pos);
+	vec3  	ligDir = normalize(ligPos - jit_in.pos);
+	float 	attDif	= 1./(1. + ligDis*ligDis);
+	float 	dif 	= max(dot(jit_in.nor, ligDir), 0.);
+
+			ligPos = specularMostRepresentativePoint;
+	  		ligDir = normalize(ligPos - jit_in.pos);
+	  		ligDis = length(ligPos - jit_in.pos);
+	float 	attSpe	= 1./(1. + ligDis*ligDis);
+	float	spe 	= max(dot(R, ligDir), 0.);
+			spe 	= pow(spe, 100.);
+	vec3	ligCol 	= vec3(1.)*4.;
+			col.rgb = ligCol * (dif*attDif + spe*attSpe);
+
+			//col.rgb = getLineLight(jit_in.pos, jit_in.nor, V, a, b);//  
+			col.rgb /= col.rgb + vec3(1.);
 			col.rgb = pow(col.rgb, vec3(1./2.2));
 			col.a 	= 1.;
 }	
