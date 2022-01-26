@@ -1,0 +1,139 @@
+<jittershader name="fill-flat-quads">
+	<description>Default Shader </description>
+	<param name="pos" type="vec3" state="POSITION" />
+	<param name="nor" type="vec3" state="NORMAL" />
+	<param name="M" type="mat4" state="WORLD_MATRIX" />
+	<param name="eye" type="vec3" state="CAMERA_POSITION" />
+	<param name="MVP" type="mat4" state="MODELVIEW_PROJECTION_MATRIX" />
+	<language name="glsl" version="1.5">
+		<bind param="pos" program="vp" />
+		<bind param="nor" program="vp" />
+		<bind param="M" program="vp" />
+		<bind param="MVP" program="vp" />
+		<bind param="eye" program="fp" />
+		<program name="vp" type="vertex">
+<![CDATA[
+#version 330 core
+uniform mat4 MVP, M;
+in vec3 pos, nor;
+
+out jit_PerVertex {
+	smooth vec3 nor;
+	smooth vec3 pos;
+} jit_out;
+
+void main() {	
+	gl_Position = MVP * vec4(pos, 1.);	
+	jit_out.nor = (M * vec4(nor, 0.)).xyz;
+	jit_out.pos = (M * vec4(pos, 1.)).xyz;
+}
+]]>
+		</program>
+		<program name="fp" type="fragment">
+<![CDATA[
+#version 330 core
+#define TWOPI 6.28318531
+
+uniform vec3 eye;
+
+in jit_PerVertex {
+	smooth vec3 nor;
+	smooth vec3 pos;
+} jit_in;
+
+out vec4 col;
+
+void checkIntersections(inout vec3 a, inout vec3 b, inout vec3 PA, inout vec3 PB, inout vec3 AB, vec3 N, vec3 P){
+    // If points are on opposite sides, guaranteed intersection
+    float PAdotN = dot(PA, N);
+    float PBdotN = dot(PB, N);
+    if(PAdotN > 0.0 != PBdotN > 0.0)
+    {
+        float t = -PAdotN / dot(AB, N);
+        vec3 intersectionPoint = a + t * AB;
+        if (PAdotN > 0.0)
+        {
+            b = intersectionPoint;
+        }
+        else
+        {
+			a = intersectionPoint;
+        }
+    PA = a - P;
+	PB = b - P;
+	AB = b - a;  
+    }
+}
+float getLightInt(float x, float lenAB){
+	return 1. + (-0.5 * cos(x*TWOPI) + 0.5)*lenAB;
+}
+vec3 getDifMRP(vec3 a, vec3 b, vec3 PA, vec3 PB, vec3 AB, float lenAB, inout float difInt){
+
+	float lenPA = length(PA);
+	float lenPB = length(PB);
+	//float lenAB = length(AB);
+
+	// Bisector theorem states that a / b = x / y, where c = x + y = length(AB)
+	// Therefore x = c * a / (b + a). Note that c cancels out when normalizing AB
+	 
+	float x = lenPA / (lenPB + lenPA);
+	difInt = getLightInt(x, lenAB);
+	return a + AB * x;
+}
+vec3 getSpeMRP(vec3 a, vec3 b, vec3 PA, vec3 PB, vec3 AB, vec3 R, float lenAB, inout float speInt){
+
+	// If R is normalized, dot(R, R) = 1 and can be optimized away
+	float ABdotR = dot(AB, R);
+	float t_num = dot(R, PA) * ABdotR - dot(AB, PA);
+	float t_denom = dot(AB, AB) - ABdotR * ABdotR;
+	float t = clamp(t_num / t_denom, 0., 1.);
+	
+	speInt = getLightInt(t, lenAB);
+	return a + AB * t;
+}
+float getAtt(vec3 PA, vec3 AB, vec3 P){
+
+	//ray-marched distance
+  	float h 		= clamp( dot(PA,AB)/dot(AB,AB), 0.0, 1.0 );
+  	float d 		= length( PA - AB*h );
+  	return 	1 / (d*d);
+}
+vec3 getTubeLight(vec3 P, vec3 N, vec3 R, vec3 a, vec3 b, vec3 ligCol){
+	vec3 PA = a - P;
+	vec3 PB = b - P;
+	vec3 AB = b - a;
+	checkIntersections(a, b, PA, PB, AB, N, P);
+	float lenAB = length(AB);
+	float difInt, speInt; //Intesity of the two components
+	vec3 	difMRP 	= getDifMRP(a, b, PA, PB, AB, lenAB, difInt);
+	vec3 	speMRP 	= getSpeMRP(a, b, PA, PB, AB, R, lenAB, speInt);
+	float 	att 	= getAtt(PA, AB, P);
+
+	//phong
+	vec3  	difDir 	= normalize(difMRP - P);
+	vec3  	speDir 	= normalize(speMRP - P);
+	float 	dif 	= max(dot(jit_in.nor, difDir), 0.);
+	float	spe 	= max(dot(R, speDir), 0.);
+			spe 	= pow(spe, 100);
+			dif *= difInt;
+			spe *= speInt;
+
+	return	ligCol * mix(dif, spe, 0.8) * att;
+}
+void main() {
+
+	vec3 V 	= normalize(jit_in.pos - eye);
+	vec3 R 	= normalize(reflect(V, jit_in.nor));
+	vec3 a 	= vec3(-2., 1., 0.);
+	vec3 b 	= vec3(2., 1., 0.);
+	vec3	ligCol 	= vec3(1.)*1.;
+			col.rgb = getTubeLight(jit_in.pos, jit_in.nor, R, a, b, ligCol);
+
+			col.rgb /= col.rgb + vec3(1.);
+			col.rgb = pow(col.rgb, vec3(1./2.2));
+			col.a 	= 1.;
+}	
+]]>
+		</program>
+	</language>
+</jittershader>

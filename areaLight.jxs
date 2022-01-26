@@ -82,9 +82,34 @@ void main() {
 	vec3 R 	= normalize(reflect(V, jit_in.nor));
 	vec3 a 	= vec3(-1., 1., 0.);
 	vec3 b 	= vec3(1., 1., 0.);
-	vec3 PA = jit_in.pos - a;
-	vec3 PB = jit_in.pos - b;
+	vec3 PA = a - jit_in.pos;
+	vec3 PB = b - jit_in.pos;
 	vec3 AB = b - a;
+
+    // Horizon Handling
+    
+
+    // If points are on opposite sides, guaranteed intersection
+    float PAdotN = dot(PA, jit_in.nor);
+    float PBdotN = dot(PB, jit_in.nor);
+    if(PAdotN > 0.0 != PBdotN > 0.0)
+    {
+        float t = -PAdotN / dot(AB, jit_in.nor);
+        vec3 intersectionPoint = a + t * AB;
+        if (PAdotN > 0.0)
+        {
+            b = intersectionPoint;
+        }
+        else
+        {
+			a = intersectionPoint;
+        }
+    }
+    
+	PA = a - jit_in.pos;
+	PB = b - jit_in.pos;
+	AB = b - a;
+
 	float la = length(PA);
 	float lb = length(PB);
  
@@ -95,27 +120,29 @@ float x = la / (lb + la);
 vec3 diffuseMostRepresentativePoint = a + AB * x;
 
 // If R is normalized, dot(R, R) = 1 and can be optimized away
-float t_num = dot(R, PA) * dot(AB, R) - dot(AB, PA);
-float t_denom = dot(AB, AB) - dot(AB, R) * dot(AB, R);
+float ABdotR = dot(AB, R);
+float t_num = dot(R, PA) * ABdotR - dot(AB, PA);
+float t_denom = dot(AB, AB) - ABdotR * ABdotR;
 float t = clamp(t_num / t_denom, 0., 1.);
  
 vec3 specularMostRepresentativePoint = a + AB * t;
 
-	//vec4 	lig 	= SDFline(jit_in.pos, a, b);
+	vec4 	lig 	= SDFline(jit_in.pos, a, b);
 	vec3    ligPos = diffuseMostRepresentativePoint;
 	float  	ligDis = length(ligPos - jit_in.pos);
 	vec3  	ligDir = normalize(ligPos - jit_in.pos);
-	float 	attDif	= 1./(1. + ligDis*ligDis);
+	float 	attDif	= 1./(ligDis*ligDis);
 	float 	dif 	= max(dot(jit_in.nor, ligDir), 0.);
 
 			ligPos = specularMostRepresentativePoint;
 	  		ligDir = normalize(ligPos - jit_in.pos);
 	  		ligDis = length(ligPos - jit_in.pos);
-	float 	attSpe	= 1./(1. + ligDis*ligDis);
+	float 	attSpe	= 1./(ligDis*ligDis);
 	float	spe 	= max(dot(R, ligDir), 0.);
 			spe 	= pow(spe, 100.);
 	vec3	ligCol 	= vec3(1.)*4.;
-			col.rgb = ligCol * (dif*attDif + spe*attSpe);
+			//col.rgb = ligCol * mix(dif*attDif, spe*attSpe, 0.9);
+			col.rgb = ligCol * mix(dif, spe, 0.9) * (1. / (lig.w*lig.w));
 
 			//col.rgb = getLineLight(jit_in.pos, jit_in.nor, V, a, b);//  
 			col.rgb /= col.rgb + vec3(1.);
