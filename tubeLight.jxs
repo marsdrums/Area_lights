@@ -65,7 +65,7 @@ void checkIntersections(inout vec3 a, inout vec3 b, inout vec3 PA, inout vec3 PB
     }
 }
 float getLightInt(float x, float lenAB){
-	return 1. + (-0.5 * cos(x*PI) + 0.5)*lenAB;
+	return 1. + (-0.5 * cos(x*PI*2) + 0.5)*lenAB*0.1;
 }
 vec3 getDifMRP(vec3 a, vec3 b, vec3 PA, vec3 PB, vec3 AB, float lenAB, inout float difInt){
 
@@ -94,8 +94,8 @@ vec3 getSpeMRP(vec3 a, vec3 b, vec3 PA, vec3 PB, vec3 AB, vec3 R, float lenAB, i
 float getAtt(vec3 PA, vec3 AB, vec3 P){
 
 	//ray-marched distance
-  	float h 		= clamp( dot(PA,AB)/dot(AB,AB), 0.0, 1.0 );
-  	float d 		= length( PA - AB*h );
+  	float h 		= clamp( dot(-PA,AB)/dot(AB,AB), 0.0, 1.0 );
+  	float d 		= length( -PA - AB*h );
   	return 	1 / (d*d);
 }
 vec3 getTubeLight(vec3 P, vec3 N, vec3 R, vec3 a, vec3 b, vec3 ligCol){
