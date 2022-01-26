@@ -32,6 +32,7 @@ void main() {
 		<program name="fp" type="fragment">
 <![CDATA[
 #version 330 core
+#define TWOPI 6.28318531
 
 uniform vec3 eye;
 
@@ -41,17 +42,24 @@ in jit_PerVertex {
 } jit_in;
 
 out vec4 col;
+float dot2(vec3 v){return dot(v,v);}
+// Triangle intersection. Returns { t, u, v }
 
-vec4 SDFline( vec3 p, vec3 a, vec3 b)
+vec3 triIntersect( vec3 ro, vec3 rd, vec3 v0, vec3 v1, vec3 v2 )
 {
-  vec3 	pa 		= p - a, ba = b - a;
-  float h 		= clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
-  float r 		= 0.0;
-  vec3 	hitPos 	= mix(a, b, vec3(h));
-  float d 		= length( pa - ba*h ) - r;
-  return 		vec4( hitPos, d );
+    vec3 v1v0 = v1 - v0;
+    vec3 v2v0 = v2 - v0;
+    vec3 rov0 = ro - v0;
+    vec3  n = cross( v1v0, v2v0 );
+    vec3  q = cross( rov0, rd );
+    float d = 1.0/dot( rd, n );
+    float u = d*dot( -q, v2v0 );
+    float v = d*dot(  q, v1v0 );
+    float t = d*dot( -n, rov0 );
+if( u<0.0 || u>1.0 || v<0.0 || (u+v)>1.0 ) t = -1.0;
+    //t=min(u, min(v, min(1.0-(u+v), t)));// brachless version of if( u<0.0 || v<0.0 || (u+v)>1.0 ) t = -1.0;
+    return vec3( t, u, v );
 }
-/*
 float SDFquad( vec3 p, vec3 a, vec3 b, vec3 c, vec3 d )
 {
   vec3 ba = b - a; vec3 pa = p - a;
@@ -60,7 +68,7 @@ float SDFquad( vec3 p, vec3 a, vec3 b, vec3 c, vec3 d )
   vec3 ad = a - d; vec3 pd = p - d;
   vec3 nor = cross( ba, ad );
 
-  return sqrt(
+  float dist = sqrt(
     (sign(dot(cross(ba,nor),pa)) +
      sign(dot(cross(cb,nor),pb)) +
      sign(dot(cross(dc,nor),pc)) +
@@ -73,28 +81,15 @@ float SDFquad( vec3 p, vec3 a, vec3 b, vec3 c, vec3 d )
      dot2(ad*clamp(dot(ad,pd)/dot2(ad),0.0,1.0)-pd) )
      :
      dot(nor,pa)*dot(nor,pa)/dot2(nor) );
+  return 1. / (dist*dist);
 }
-*/
-
-void main() {
-
-	vec3 V 	= normalize(jit_in.pos - eye);
-	vec3 R 	= normalize(reflect(V, jit_in.nor));
-	vec3 a 	= vec3(-1., 1., 0.);
-	vec3 b 	= vec3(1., 1., 0.);
-	vec3 PA = a - jit_in.pos;
-	vec3 PB = b - jit_in.pos;
-	vec3 AB = b - a;
-
-    // Horizon Handling
-    
-
+void checkIntersections(inout vec3 a, inout vec3 b, inout vec3 PA, inout vec3 PB, inout vec3 AB, vec3 N, vec3 P){
     // If points are on opposite sides, guaranteed intersection
-    float PAdotN = dot(PA, jit_in.nor);
-    float PBdotN = dot(PB, jit_in.nor);
+    float PAdotN = dot(PA, N);
+    float PBdotN = dot(PB, N);
     if(PAdotN > 0.0 != PBdotN > 0.0)
     {
-        float t = -PAdotN / dot(AB, jit_in.nor);
+        float t = -PAdotN / dot(AB, N);
         vec3 intersectionPoint = a + t * AB;
         if (PAdotN > 0.0)
         {
@@ -104,49 +99,164 @@ void main() {
         {
 			a = intersectionPoint;
         }
+    PA = a - P;
+	PB = b - P;
+	AB = b - a;  
     }
-    
-	PA = a - jit_in.pos;
-	PB = b - jit_in.pos;
-	AB = b - a;
+}
+float getLightInt(float x, float lenAB){
+	return 1. + (-0.5 * cos(x*TWOPI) + 0.5)*lenAB*0.1;
+}
+vec3 getDifMRP(vec3 a, vec3 b, vec3 PA, vec3 PB, vec3 AB, float lenAB){
 
-	float la = length(PA);
-	float lb = length(PB);
- 
-// Bisector theorem states that a / b = x / y, where c = x + y = length(AB)
-// Therefore x = c * a / (b + a). Note that c cancels out when normalizing AB
- 
-float x = la / (lb + la);
-vec3 diffuseMostRepresentativePoint = a + AB * x;
+	float lenPA = length(PA);
+	float lenPB = length(PB);
+	//float lenAB = length(AB);
 
-// If R is normalized, dot(R, R) = 1 and can be optimized away
-float ABdotR = dot(AB, R);
-float t_num = dot(R, PA) * ABdotR - dot(AB, PA);
-float t_denom = dot(AB, AB) - ABdotR * ABdotR;
-float t = clamp(t_num / t_denom, 0., 1.);
- 
-vec3 specularMostRepresentativePoint = a + AB * t;
+	// Bisector theorem states that a / b = x / y, where c = x + y = length(AB)
+	// Therefore x = c * a / (b + a). Note that c cancels out when normalizing AB
+	 
+	float x = lenPA / (lenPB + lenPA);
+	return a + AB * x;
+}
+vec3 getSpeMRP(vec3 a, vec3 b, vec3 PA, vec3 PB, vec3 AB, vec3 R, float lenAB, inout float speInt){
 
-	vec4 	lig 	= SDFline(jit_in.pos, a, b);
-	vec3    ligPos = diffuseMostRepresentativePoint;
-	float  	ligDis = length(ligPos - jit_in.pos);
-	vec3  	ligDir = normalize(ligPos - jit_in.pos);
-	float 	attDif	= 1./(ligDis*ligDis);
-	float 	dif 	= max(dot(jit_in.nor, ligDir), 0.);
+	// If R is normalized, dot(R, R) = 1 and can be optimized away
+	float ABdotR = dot(AB, R);
+	float t_num = dot(R, PA) * ABdotR - dot(AB, PA);
+	float t_denom = dot(AB, AB) - ABdotR * ABdotR;
+	float t = clamp(t_num / t_denom, 0., 1.);
+	
+	speInt = getLightInt(t, lenAB);
+	return a + AB * t;
+}
+float getAtt(vec3 PA, vec3 AB, vec3 P){
 
-			ligPos = specularMostRepresentativePoint;
-	  		ligDir = normalize(ligPos - jit_in.pos);
-	  		ligDis = length(ligPos - jit_in.pos);
-	float 	attSpe	= 1./(ligDis*ligDis);
-	float	spe 	= max(dot(R, ligDir), 0.);
-			spe 	= pow(spe, 100.);
-	vec3	ligCol 	= vec3(1.)*4.;
-			//col.rgb = ligCol * mix(dif*attDif, spe*attSpe, 0.9);
-			col.rgb = ligCol * mix(dif, spe, 0.9) * (1. / (lig.w*lig.w));
+	//ray-marched distance
+  	float h 		= clamp( dot(-PA,AB)/dot(AB,AB), 0.0, 1.0 );
+  	float d 		= length( -PA - AB*h );
+  	return 	1 / (d*d);
+}
+vec3 getAreaLight(vec3 P, vec3 N, vec3 R, vec3 a, vec3 b, vec3 c, vec3 d, vec3 ligCol){
+	vec3 PA = a - P;
+	vec3 PB = b - P;
+	vec3 PC = c - P;
+	vec3 PD = d - P;
 
-			//col.rgb = getLineLight(jit_in.pos, jit_in.nor, V, a, b);//  
+	vec3 AB = b - a;
+	vec3 BC = c - b;
+	vec3 CD = d - c;
+	vec3 DA = a - d;
+	//checkIntersections(a, b, PA, PB, AB, N, P);
+	float lenAB = length(AB);
+	float lenBC = length(BC);
+	float lenCD = length(CD);
+	float lenDA = length(DA);
+	float difIntAB, difIntBC, difIntCD, difIntDA; //Intesity of the two components
+	float speIntAB, speIntBC, speIntCD, speIntDA;
+	vec3 	difMRPAB 	= getDifMRP(a, b, PA, PB, AB, lenAB);
+	vec3 	difMRPBC 	= getDifMRP(b, c, PB, PC, BC, lenBC);
+	vec3 	difMRPCD 	= getDifMRP(c, d, PC, PD, CD, lenCD);
+	vec3 	difMRPDA 	= getDifMRP(d, a, PD, PA, DA, lenDA);
+	vec3 	speMRPAB 	= getSpeMRP(a, b, PA, PB, AB, R, lenAB, speIntAB);
+	vec3 	speMRPBC 	= getSpeMRP(b, c, PB, PC, BC, R, lenBC, speIntBC);
+	vec3 	speMRPCD 	= getSpeMRP(c, d, PC, PD, CD, R, lenCD, speIntCD);
+	vec3 	speMRPDA 	= getSpeMRP(d, a, PD, PA, DA, R, lenDA, speIntDA);
+	
+	vec3 	difMRP = (difMRPAB+difMRPBC+difMRPCD+difMRPDA)*0.25;
+	float 	difInt = (difIntAB+difIntBC+difIntCD+difIntDA)*0.25;
+	vec3 	speMRP = (speMRPAB+speMRPBC+speMRPCD+speMRPDA)*0.25;
+	float 	speInt = (speIntAB+speIntBC+speIntCD+speIntDA)*0.25;
+
+	float 	att 	= SDFquad(P, a, b, c, d);
+
+	//phong
+	vec3  	difDir 	= normalize(difMRP - P);
+	vec3  	speDir 	= normalize(speMRP - P);
+	float 	dif 	= max(dot(jit_in.nor, difDir), 0.);
+	float	spe 	= max(dot(R, speDir), 0.);
+			spe 	= pow(spe, 100);
+			dif *= difInt;
+			spe *= speInt;
+
+	return	ligCol * mix(dif, spe, 0.8) * att;
+}
+vec3 getClosest(vec3 a, vec3 b, vec3 P){
+	return length(a - P) < length(b - P) ? a : b;
+}
+void main() {
+
+
+	vec3 a 	= vec3(-1., 3., -1.);
+	vec3 b 	= vec3(1., 3., -1.);
+	vec3 c 	= vec3(1., 3., 1.);
+	vec3 d 	= vec3(-1., 3., 1.);
+	vec3	ligCol 	= vec3(1.)*7;
+			//col.rgb = getAreaLight(jit_in.pos, jit_in.nor, R, a, b, c, d, ligCol);
+
+
+	vec3 ro = jit_in.pos;
+	vec3 rd = normalize(jit_in.nor);
+	vec3 V 	= normalize(ro - eye);
+	vec3 R 	= normalize(reflect(V, rd));
+//try to intersect the first triangle
+//ABC
+	vec3 ABC = triIntersect(ro, rd, a, b, c );
+	vec3 CDA = triIntersect(ro, rd, c, d, a );
+	col.rgb = vec3(1., 0., 0.);
+	if(ABC.r > 0. || CDA.r > 0.){
+
+		vec3 MRP = ABC.r > CDA.r ? ro + ABC.r*rd : ro + CDA.r*rd;
+
+		vec3  	dir 	= normalize(MRP - ro);
+		float 	dif 	= max(dot(rd, dir), 0.);
+		float	spe 	= max(dot(R, dir), 0.);
+				spe 	= pow(spe, 100);
+		float dist = length(MRP - ro);
+		float att = 1. / (dist*dist);
+			//dif *= difInt;
+			//spe *= speInt;
+
+			col.rgb = ligCol * dif*att;//mix(dif, spe, 0.8) * att;
+	} else{
+
+	vec3 PA = a - ro;
+	vec3 PB = b - ro;
+	vec3 PC = c - ro;
+	vec3 PD = d - ro;
+
+	vec3 AB = b - a;
+	vec3 BC = c - b;
+	vec3 CD = d - c;
+	vec3 DA = a - d;
+	//checkIntersections(a, b, PA, PB, AB, N, P);
+	float lenAB = length(AB);
+	float lenBC = length(BC);
+	float lenCD = length(CD);
+	float lenDA = length(DA);
+	vec3 	MRPAB 	= getDifMRP(a, b, PA, PB, AB, lenAB);
+	vec3 	MRPBC 	= getDifMRP(b, c, PB, PC, BC, lenBC);
+	vec3 	MRPCD 	= getDifMRP(c, d, PC, PD, CD, lenCD);
+	vec3 	MRPDA 	= getDifMRP(d, a, PD, PA, DA, lenDA);
+	vec3 	MRP = getClosest(MRPAB, getClosest(MRPBC, getClosest(MRPCD, MRPDA, ro), ro), ro);
+
+
+	vec3  	dir 	= normalize(MRP - ro);;
+	float 	dif 	= max(dot(rd, dir), 0.);
+	float	spe 	= max(dot(R, dir), 0.);
+			spe 	= pow(spe, 100);
+	float dist = length(MRP - ro);
+	float att = 1. / (dist*dist);
+			//dif *= difInt;
+			//spe *= speInt;
+
+			col.rgb = ligCol * dif*att;//mix(dif, spe, 0.8) * att;
+
+	}
+
 			col.rgb /= col.rgb + vec3(1.);
 			col.rgb = pow(col.rgb, vec3(1./2.2));
+
 			col.a 	= 1.;
 }	
 ]]>
