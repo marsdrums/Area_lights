@@ -104,22 +104,15 @@ float getSpe(vec3 P, vec3 N, vec3 R, in light lig){
     vec2 	planePointProj 		= vec2(dot(planePointCenter, lig.right), dot(planePointCenter, lig.up));
     		planePointProj.x 	= clamp(planePointProj.x, -lig.halfWidth, lig.halfWidth);
     		planePointProj.y 	= clamp(planePointProj.y, -lig.halfHeight, lig.halfHeight);
-
-
     vec3 	L 					= lig.pos + lig.right*planePointProj.x + lig.up*planePointProj.y;  
     		L -= P; 
 
-
-    //if (planePointProj.x >= -lig.halfWidth && planePointProj.x >= -lig.halfHeight && planePointProj.y <= lig.halfWidth && planePointProj.y <= lig.halfHeight){
-    	vec3 	ligDir 	= normalize(L);
-    	float	ligDis 	= length(L);
-    	float 	spe 	= max(dot(ligDir, R), 0.);
-    	return 	pow(spe, 1000) * (1./(ligDis*ligDis));
-    	//return 0.;
-    //}
-
-
-    //return 	0.;
+    vec3 	ligDir 	= normalize(L);
+    float	ligDis 	= length(L);
+    float 	spe 	= max(dot(ligDir, R), 0.);
+    return pow(spe, 200.)* (1./(ligDis*ligDis));
+    //return 	pow(spe, 20) * (smoothstep(0., 1., saturate(1. - abs((planePointProj.x/lig.halfWidth)))*4)*0.6 + 0.4)
+    //					* (smoothstep(0., 1., saturate(1. - abs((planePointProj.y/lig.halfHeight)))*4)*0.6 + 0.4) * (1./(ligDis*ligDis));
 
 }
 
@@ -131,8 +124,9 @@ void main() {
 	vec3 	N = normalize(jit_in.nor);
 	vec3 	V = normalize(P - eye);
 	vec3 	R = reflect(V, N);
-
+			col.rgb = vec3(0.);
 	//set ligh parameters
+	{
 			light lig;
 			lig.pos = vec3(0., 1., 0);
 			lig.up = vec3(0., 1., 0.);
@@ -152,7 +146,36 @@ void main() {
 	float 	dif = windingCheck ? getDif(P, N, R, lig) : 0.;
 	float 	spe = windingCheck ? getSpe(P, N, R, lig) : 0.;
 
-			col.rgb = vec3(mix(dif, spe, 0.5));
+			col.rgb += vec3(mix(dif, spe, 0.5));
+		}
+	{
+			//set ligh parameters
+			light lig;
+			lig.pos = vec3(0., 4., 0);
+			lig.up = vec3(1., 0., 0.);
+			lig.right = vec3(0., 0., -1.);
+			lig.front = normalize(cross(lig.right, lig.up));
+			lig.width = 1;
+			lig.height = 4.;
+			lig.halfWidth = lig.width * 0.5;
+			lig.halfHeight = lig.height * 0.5;
+
+    		lig.p0 = lig.pos + lig.halfWidth * lig.right + lig.halfHeight * lig.up;
+    		lig.p1 = lig.pos - lig.halfWidth * lig.right + lig.halfHeight * lig.up;
+    		lig.p2 = lig.pos - lig.halfWidth * lig.right - lig.halfHeight * lig.up;
+    		lig.p3 = lig.pos + lig.halfWidth * lig.right - lig.halfHeight * lig.up;
+
+    bool 	windingCheck = dot(lig.front, lig.pos - P) < 0.;
+	float 	dif = windingCheck ? getDif(P, N, R, lig) : 0.;
+	float 	spe = windingCheck ? getSpe(P, N, R, lig) : 0.;
+
+			col.rgb += vec3(mix(dif, spe, 0.5))*vec3(0.9, 0.1, 0.2);
+	}
+
+
+
+
+
 			col.rgb /= col.rgb + vec3(1.);
 			col.rgb = pow(col.rgb, vec3(1./2.2));
 			col.a 	= 1.;
