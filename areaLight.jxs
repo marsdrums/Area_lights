@@ -105,6 +105,7 @@ float getSpe(vec3 P, vec3 N, vec3 R, in light lig){
     		planePointProj.x 	= clamp(planePointProj.x, -lig.halfWidth, lig.halfWidth);
     		planePointProj.y 	= clamp(planePointProj.y, -lig.halfHeight, lig.halfHeight);
 
+
     vec3 	L 					= lig.pos + lig.right*planePointProj.x + lig.up*planePointProj.y;  
     		L -= P; 
 
@@ -113,8 +114,10 @@ float getSpe(vec3 P, vec3 N, vec3 R, in light lig){
     	vec3 	ligDir 	= normalize(L);
     	float	ligDis 	= length(L);
     	float 	spe 	= max(dot(ligDir, R), 0.);
-    	return 	pow(spe, 1000);// * (1./(ligDis*ligDis));
+    	return 	pow(spe, 1000) * (1./(ligDis*ligDis));
+    	//return 0.;
     //}
+
 
     //return 	0.;
 
