@@ -125,7 +125,8 @@ void main() {
 	vec3 	V = normalize(P - eye);
 	vec3 	R = reflect(V, N);
 			col.rgb = vec3(0.);
-	//set ligh parameters
+
+	//set light parameters
 	{
 			light lig;
 			lig.pos = vec3(0., 1., 0);
@@ -142,12 +143,12 @@ void main() {
     		lig.p2 = lig.pos - lig.halfWidth * lig.right - lig.halfHeight * lig.up;
     		lig.p3 = lig.pos + lig.halfWidth * lig.right - lig.halfHeight * lig.up;
 
-    bool 	windingCheck = dot(lig.front, lig.pos - P) < 0.;
+   bool 		windingCheck = dot(lig.front, lig.pos - P) < 0.;
 	float 	dif = windingCheck ? getDif(P, N, R, lig) : 0.;
 	float 	spe = windingCheck ? getSpe(P, N, R, lig) : 0.;
 
 			col.rgb += vec3(mix(dif, spe, 0.5));
-		}
+	}
 	{
 			//set ligh parameters
 			light lig;
@@ -165,7 +166,7 @@ void main() {
     		lig.p2 = lig.pos - lig.halfWidth * lig.right - lig.halfHeight * lig.up;
     		lig.p3 = lig.pos + lig.halfWidth * lig.right - lig.halfHeight * lig.up;
 
-    bool 	windingCheck = dot(lig.front, lig.pos - P) < 0.;
+   bool 		windingCheck = dot(lig.front, lig.pos - P) < 0.;
 	float 	dif = windingCheck ? getDif(P, N, R, lig) : 0.;
 	float 	spe = windingCheck ? getSpe(P, N, R, lig) : 0.;
 
