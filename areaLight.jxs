@@ -40,11 +40,11 @@ uniform vec3 eye;
 struct light{
 	vec3 pos; 
 	vec3 up;
-	vec3 left;
+	vec3 right;
 	vec3 front;
-    vec2 halfSize;
-    float width;
-    float height;
+    float width, halfWidth;
+    float height, halfHeight;
+    vec3 p0, p1, p2, p3;
 };
 
 in jit_PerVertex {
@@ -56,79 +56,103 @@ out vec4 col;
 
 float saturate(float x){return clamp(x, 0., 1.);}
 
-float rectSolidAngle(vec3 p, vec3 p0, vec3 p1, vec3 p2, vec3 p3){
+float rectSolidAngle(vec3 P, in light lig){
 
-    vec3 v0 = p0 - p;
-    vec3 v1 = p1 - p;
-    vec3 v2 = p2 - p;
-    vec3 v3 = p3 - p;
+    vec3 	v0 = lig.p0 - P;
+    vec3 	v1 = lig.p1 - P;
+    vec3 	v2 = lig.p2 - P;
+    vec3 	v3 = lig.p3 - P;
     
-    vec3 n0 = normalize(cross(v0, v1));
-    vec3 n1 = normalize(cross(v1, v2));
-    vec3 n2 = normalize(cross(v2, v3));
-    vec3 n3 = normalize(cross(v3, v0));
+    vec3 	n0 = normalize(cross(v0, v1));
+    vec3 	n1 = normalize(cross(v1, v2));
+    vec3 	n2 = normalize(cross(v2, v3));
+    vec3 	n3 = normalize(cross(v3, v0));
     
-    float g0 = acos(dot(-n0, n1));
-	float g1 = acos(dot(-n1, n2));
-	float g2 = acos(dot(-n2, n3));
-	float g3 = acos(dot(-n3, n0));
+    float 	g0 = acos(dot(-n0, n1));
+	float 	g1 = acos(dot(-n1, n2));
+	float 	g2 = acos(dot(-n2, n3));
+	float 	g3 = acos(dot(-n3, n0));
     
-    return g0 + g1 + g2 + g3 - TWOPI;
+    return 	g0 + g1 + g2 + g3 - TWOPI;
 }
+vec3 rayPlaneIntersect(vec3 ro, vec3 rd, light lig)
+{
+   return ro + rd*(dot(lig.front, lig.pos - ro) / dot(lig.front, rd));
+}
+float getDif(vec3 P, vec3 N, vec3 R, in light lig){
 
-void getDiff(vec3 P, vec3 N, vec3 R, in light lig, inout float dif, inout float spe){
+	float 	solidAngle = rectSolidAngle(P, lig);
 
-	//if ( dot(P - lig.pos, N) < 0.){return 0.;}
-
-	float halfWidth = lig.width * 0.5;
-	float halfHeight = lig.height * 0.5;
-	vec3 p0 = lig.pos + lig.left * -halfWidth + lig.up * +halfHeight ;
-	vec3 p1 = lig.pos + lig.left * -halfWidth + lig.up * -halfHeight ;
-	vec3 p2 = lig.pos + lig.left * +halfWidth + lig.up * -halfHeight ;
-	vec3 p3 = lig.pos + lig.left * +halfWidth + lig.up * +halfHeight ;
-	float solidAngle = rectSolidAngle ( P , p0 , p1 , p2 , p3 );
-
-	dif = solidAngle * 0.2 * (
-	saturate ( dot( normalize ( p0 - P ) , N ) )+
-	saturate ( dot( normalize ( p1 - P ) , N ) )+
-	saturate ( dot( normalize ( p2 - P ) , N ) )+
-	saturate ( dot( normalize ( p3 - P ) , N ) )+
-	saturate ( dot( normalize ( lig.pos - P ) , N ))
-	);
 	//mean of five point light multiplied by the solid angle
+	return 	solidAngle * 0.2 * (
+			saturate ( dot( normalize ( lig.p0 - P ) , N ) )+
+			saturate ( dot( normalize ( lig.p1 - P ) , N ) )+
+			saturate ( dot( normalize ( lig.p2 - P ) , N ) )+
+			saturate ( dot( normalize ( lig.p3 - P ) , N ) )+
+			saturate ( dot( normalize ( lig.pos - P ) , N ))
+			);
 
-	spe = solidAngle * 0.2 * (
-	saturate ( dot( R, normalize ( p0 - P )) )+
-	saturate ( dot( R, normalize ( p1 - P )) )+
-	saturate ( dot( R, normalize ( p2 - P )) )+
-	saturate ( dot( R, normalize ( p3 - P )) )+
-	saturate ( dot( R, normalize ( lig.pos - P )))
-	);
-	spe = pow(spe, 10.);
+}
+float getSpe(vec3 P, vec3 N, vec3 R, in light lig){
+
+	vec3 	ro = P;
+	vec3 	rd = R;
+
+    // calculate point on the rectangle surface/edge based on the ray originating from the shaded point
+    vec3 	planePointCenter 	= rayPlaneIntersect(ro, rd, lig) - lig.pos;
+    // project point on the plane on which the rectangle lies
+    vec2 	planePointProj 		= vec2(dot(planePointCenter, lig.right), dot(planePointCenter, lig.up));
+    		planePointProj.x 	= clamp(planePointProj.x, -lig.halfWidth, lig.halfWidth);
+    		planePointProj.y 	= clamp(planePointProj.y, -lig.halfHeight, lig.halfHeight);
+
+    vec3 	L 					= lig.pos + lig.right*planePointProj.x + lig.up*planePointProj.y;  
+    		L -= P; 
+
+
+    //if (planePointProj.x >= -lig.halfWidth && planePointProj.x >= -lig.halfHeight && planePointProj.y <= lig.halfWidth && planePointProj.y <= lig.halfHeight){
+    	vec3 	ligDir 	= normalize(L);
+    	float	ligDis 	= length(L);
+    	float 	spe 	= max(dot(ligDir, R), 0.);
+    	return 	pow(spe, 1000);// * (1./(ligDis*ligDis));
+    //}
+
+    //return 	0.;
+
 }
 
 void main() {
 //I'm trying the Frostbite implementation of a rectangular light
 //https://seblagarde.files.wordpress.com/2015/07/course_notes_moving_frostbite_to_pbr_v32.pdf
-	vec3 P = jit_in.pos;
-	vec3 N = normalize(jit_in.nor);
-	vec3 V = normalize(P - eye);
-	vec3 R = reflect(V, N);
+//and https://www.shadertoy.com/view/wlSfW1
+	vec3 	P = jit_in.pos;
+	vec3 	N = normalize(jit_in.nor);
+	vec3 	V = normalize(P - eye);
+	vec3 	R = reflect(V, N);
 
-	light lig;
-	lig.pos = vec3(0., -0.1, 0);
-	lig.up = vec3(0., 1., 0.);
-	lig.left = vec3(-1., 0., 0.);
-	lig.width = 1;
-	lig.height = 5.;
+	//set ligh parameters
+			light lig;
+			lig.pos = vec3(0., 1., 0);
+			lig.up = vec3(0., 1., 0.);
+			lig.right = vec3(1., 0., 0.);
+			lig.front = normalize(cross(lig.right, lig.up));
+			lig.width = 2;
+			lig.height = 2.;
+			lig.halfWidth = lig.width * 0.5;
+			lig.halfHeight = lig.height * 0.5;
 
-float dif, spe;
-getDiff(P, N, R, lig, dif, spe);
-	col.rgb = vec3(mix(dif, spe, 0.7));
-	col.rgb /= col.rgb + vec3(1.);
-	col.rgb = pow(col.rgb, vec3(1./2.2));
+    		lig.p0 = lig.pos + lig.halfWidth * lig.right + lig.halfHeight * lig.up;
+    		lig.p1 = lig.pos - lig.halfWidth * lig.right + lig.halfHeight * lig.up;
+    		lig.p2 = lig.pos - lig.halfWidth * lig.right - lig.halfHeight * lig.up;
+    		lig.p3 = lig.pos + lig.halfWidth * lig.right - lig.halfHeight * lig.up;
 
-	col.a 	= 1.;
+    bool 	windingCheck = dot(lig.front, lig.pos - P) < 0.;
+	float 	dif = windingCheck ? getDif(P, N, R, lig) : 0.;
+	float 	spe = windingCheck ? getSpe(P, N, R, lig) : 0.;
+
+			col.rgb = vec3(mix(dif, spe, 0.5));
+			col.rgb /= col.rgb + vec3(1.);
+			col.rgb = pow(col.rgb, vec3(1./2.2));
+			col.a 	= 1.;
 }	
 ]]>
 		</program>
