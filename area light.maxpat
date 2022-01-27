@@ -40,25 +40,13 @@
 		"assistshowspatchername" : 0,
 		"boxes" : [ 			{
 				"box" : 				{
-					"id" : "obj-28",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 320.0, 775.0, 125.0, 22.0 ],
-					"text" : "vexpr pow($f1\\, 1./2.2)"
-				}
-
-			}
-, 			{
-				"box" : 				{
 					"id" : "obj-27",
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 320.0, 742.0, 116.0, 22.0 ],
-					"text" : "vexpr $f1 / ($f1 + 1.)"
+					"patching_rect" : [ 302.0, 781.0, 183.0, 22.0 ],
+					"text" : "vexpr pow($f1 / ($f1 + 1.)\\, 1./2.2)"
 				}
 
 			}
@@ -69,7 +57,7 @@
 					"numinlets" : 2,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 320.0, 714.0, 65.0, 22.0 ],
+					"patching_rect" : [ 302.0, 753.0, 65.0, 22.0 ],
 					"text" : "0.9 0.1 0.2"
 				}
 
@@ -81,7 +69,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 302.0, 816.0, 98.0, 22.0 ],
+					"patching_rect" : [ 302.0, 811.0, 98.0, 22.0 ],
 					"text" : "prepend gl_color"
 				}
 
@@ -408,15 +396,8 @@
 			}
 , 			{
 				"patchline" : 				{
-					"destination" : [ "obj-28", 0 ],
-					"source" : [ "obj-27", 0 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
 					"destination" : [ "obj-24", 0 ],
-					"source" : [ "obj-28", 0 ]
+					"source" : [ "obj-27", 0 ]
 				}
 
 			}
