@@ -117,11 +117,11 @@ vec3 getDif(vec3 P, vec3 N, vec3 R, in light lig){
 
 	//mean of five point lights multiplied by the solid angle
 	return 	rectSolidAngle(lig) * 0.2 * (
-			saturate ( dot( normalize(lig.p0_P), N ) ) * textureLod(ligTex, vec2(0., 1.), length(lig.p0_P)).rgb +
-			saturate ( dot( normalize(lig.p1_P), N ) ) * textureLod(ligTex, vec2(1., 1.), length(lig.p1_P)).rgb +
-			saturate ( dot( normalize(lig.p2_P), N ) ) * textureLod(ligTex, vec2(1., 0.), length(lig.p2_P)).rgb +
-			saturate ( dot( normalize(lig.p3_P), N ) ) * textureLod(ligTex, vec2(0., 0.), length(lig.p3_P)).rgb +
-			saturate ( dot( normalize(lig.pos_P), N )) * textureLod(ligTex, vec2(0.5, 0.5), length(lig.pos_P)).rgb
+			saturate ( dot( normalize(lig.p0_P), N ) ) * pow(textureLod(ligTex, vec2(0., 1.), length(lig.p0_P)).rgb, vec3(2.2)) +
+			saturate ( dot( normalize(lig.p1_P), N ) ) * pow(textureLod(ligTex, vec2(1., 1.), length(lig.p1_P)).rgb, vec3(2.2)) +
+			saturate ( dot( normalize(lig.p2_P), N ) ) * pow(textureLod(ligTex, vec2(1., 0.), length(lig.p2_P)).rgb, vec3(2.2)) +
+			saturate ( dot( normalize(lig.p3_P), N ) ) * pow(textureLod(ligTex, vec2(0., 0.), length(lig.p3_P)).rgb, vec3(2.2)) +
+			saturate ( dot( normalize(lig.pos_P), N )) * pow(textureLod(ligTex, vec2(0.5, 0.5), length(lig.pos_P)).rgb, vec3(2.2))
 			);
 
 }
@@ -133,51 +133,35 @@ vec3 getSpe(vec3 P, vec3 N, vec3 R, in light lig){
 	//if(posDist > planeDist){return 0.;}
 
     // calculate point on the rectangle surface/edge based on the ray originating from the shaded point
-    vec3 	planePointCenter 	= rayPlaneIntersect(P, R, lig);
+   vec3 		planePointCenter 	= rayPlaneIntersect(P, R, lig);
     //float  intersectionDist = length(planePointCenter - P);
     //if(posDist < intersectionDist){return 0.;}
     // project point on the plane on which the rectangle lies
     			planePointCenter -= lig.pos;
-    vec2 	planePointProj 	= vec2(dot(planePointCenter, lig.right), dot(planePointCenter, lig.up));
+   vec2 		planePointProj 	= vec2(dot(planePointCenter, lig.right), dot(planePointCenter, lig.up));
     			planePointProj.x 	= clamp(planePointProj.x, -lig.halfWidth, lig.halfWidth);
     			planePointProj.y 	= clamp(planePointProj.y, -lig.halfHeight, lig.halfHeight);
-    vec2		uv = planePointProj/vec2(ligWidth, ligHeight) + 0.5;
-    			//uv.y = 1. - uv.y;
-    			uv.x = 1. - uv.x;
-
-    vec3 	L 						= lig.pos + lig.right*planePointProj.x + lig.up*planePointProj.y;  
-
+   vec2		uv 					= planePointProj/vec2(ligWidth, ligHeight) + 0.5;
+    			uv.x 					= 1. - uv.x;
+   vec3 		L 						= lig.pos + lig.right*planePointProj.x + lig.up*planePointProj.y; 
     			L -= P; 
-   vec3 	ligDir 	= normalize(L);
-    float	ligDis 	= length(L);
-        vec3	col = textureLod(ligTex, uv, ligDis*2.).rgb;
-    float 	spe 	= max(dot(ligDir, R), 0.);
+   vec3 		ligDir 				= normalize(L);
+   float		ligDis 				= length(L);
+   vec3		col 					= pow(textureLod(ligTex, uv, ligDis*2.).rgb, vec3(2.2));
+   float 	spe 					= max(dot(ligDir, R), 0.);
 
-    //return pow(spe, 200.)* (1./(ligDis*ligDis));
-	return pow(spe, 200.)*col* (1./(ligDis*ligDis));
-    //return 	pow(spe, 20) * (smoothstep(0., 1., saturate(1. - abs((planePointProj.x/lig.halfWidth)))*4)*0.6 + 0.4)
-    //					* (smoothstep(0., 1., saturate(1. - abs((planePointProj.y/lig.halfHeight)))*4)*0.6 + 0.4) * (1./(ligDis*ligDis));
+	return pow(spe, 200.)*col* (1./(1. + ligDis*ligDis));
 
 }
-vec3 	fresnelSchlickRoughness(float HdotV, vec3 F0, float rou){
-	float 	x = saturate(1. - HdotV); //x^5
-	float 	x2 = x*x;
-			x2 *= x2;
-			x *= x2;
-    return F0 + (max(vec3(1.0 - rou), F0) - F0) * x;
-}
-vec3 getRectLight(in light lig, vec3 P, vec3 N, vec3 R, vec3 V){
+vec3 getRectLight(in light lig, vec3 P, vec3 N, vec3 R){
 
 	getLigthParams(lig, P);
-
-	vec3	H = normalize(V + normalize(lig.pos_P));					//half vector
-	vec3 F = fresnelSchlickRoughness(saturate(dot(H, V)), vec3(0.5), 0.3);
 
    bool 	windingCheck = twoSided == 1 ? true : dot(lig.front, lig.pos - P) < 0.;
 	vec3 	dif = windingCheck ? getDif(P, N, R, lig) : vec3(0.);
 	vec3 	spe = windingCheck ? getSpe(P, N, R, lig) : vec3(0.);
-	return lig.col * mix(dif, spe, F);
-	//return lig.col * mix(dif, spe, 0.5);
+	return lig.col * mix(dif, spe, 0.5);
+
 }
 void main() {
 //I'm trying the Frostbite implementation of a rectangular light
@@ -190,7 +174,7 @@ void main() {
 			col.rgb = vec3(0.);
 
 			light lig;
-			col.rgb 	+= getRectLight(lig, P, N, R, V);
+			col.rgb 	+= getRectLight(lig, P, N, R);
 
 			col.rgb 	/= col.rgb + vec3(1.);
 			col.rgb 	= pow(col.rgb, vec3(1./2.2));
