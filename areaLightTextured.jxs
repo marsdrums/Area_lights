@@ -159,15 +159,24 @@ vec3 getSpe(vec3 P, vec3 N, vec3 R, in light lig){
     //					* (smoothstep(0., 1., saturate(1. - abs((planePointProj.y/lig.halfHeight)))*4)*0.6 + 0.4) * (1./(ligDis*ligDis));
 
 }
-
-vec3 getRectLight(in light lig, vec3 P, vec3 N, vec3 R){
+vec3 	fresnelSchlickRoughness(float HdotV, vec3 F0, float rou){
+	float 	x = saturate(1. - HdotV); //x^5
+	float 	x2 = x*x;
+			x2 *= x2;
+			x *= x2;
+    return F0 + (max(vec3(1.0 - rou), F0) - F0) * x;
+}
+vec3 getRectLight(in light lig, vec3 P, vec3 N, vec3 R, vec3 V){
 
 	getLigthParams(lig, P);
 
-   bool 		windingCheck = twoSided == 1 ? true : dot(lig.front, lig.pos - P) < 0.;
+	vec3	H = normalize(V + normalize(lig.pos_P));					//half vector
+	vec3 F = fresnelSchlickRoughness(saturate(dot(H, V)), vec3(0.5), 0.3);
+
+   bool 	windingCheck = twoSided == 1 ? true : dot(lig.front, lig.pos - P) < 0.;
 	vec3 	dif = windingCheck ? getDif(P, N, R, lig) : vec3(0.);
 	vec3 	spe = windingCheck ? getSpe(P, N, R, lig) : vec3(0.);
-return lig.col * mix(dif, spe, vec3(0.5));
+	return lig.col * mix(dif, spe, F);
 	//return lig.col * mix(dif, spe, 0.5);
 }
 void main() {
@@ -181,7 +190,7 @@ void main() {
 			col.rgb = vec3(0.);
 
 			light lig;
-			col.rgb 	+= getRectLight(lig, P, N, R);
+			col.rgb 	+= getRectLight(lig, P, N, R, V);
 
 			col.rgb 	/= col.rgb + vec3(1.);
 			col.rgb 	= pow(col.rgb, vec3(1./2.2));

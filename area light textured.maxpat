@@ -40,6 +40,18 @@
 		"assistshowspatchername" : 0,
 		"boxes" : [ 			{
 				"box" : 				{
+					"id" : "obj-40",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 962.0, 710.0, 73.0, 22.0 ],
+					"text" : "loadmess 1."
+				}
+
+			}
+, 			{
+				"box" : 				{
 					"id" : "obj-110",
 					"maxclass" : "message",
 					"numinlets" : 2,
@@ -66,10 +78,10 @@
 				"box" : 				{
 					"data" : 					{
 						"clips" : [ 							{
-								"absolutepath" : "bball.mov",
-								"filename" : "bball.mov",
+								"absolutepath" : "dishes.mov",
+								"filename" : "dishes.mov",
 								"filekind" : "moviefile",
-								"id" : "u067002469",
+								"id" : "u422003117",
 								"loop" : 1,
 								"content_state" : 								{
 									"loop" : 1
@@ -1023,7 +1035,6 @@
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 774.0, 788.0, 72.0, 22.0 ],
-					"presentation_linecount" : 2,
 					"text" : "ligHeight $1"
 				}
 
@@ -1075,18 +1086,6 @@
 					"outlettype" : [ "" ],
 					"patching_rect" : [ 869.0, 953.0, 83.0, 22.0 ],
 					"text" : "prepend ligDir"
-				}
-
-			}
-, 			{
-				"box" : 				{
-					"id" : "obj-40",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 930.0, 715.0, 73.0, 22.0 ],
-					"text" : "loadmess 1."
 				}
 
 			}
@@ -1399,13 +1398,6 @@
 		"lines" : [ 			{
 				"patchline" : 				{
 					"destination" : [ "obj-93", 0 ],
-					"source" : [ "obj-1", 1 ]
-				}
-
-			}
-, 			{
-				"patchline" : 				{
-					"destination" : [ "obj-93", 0 ],
 					"source" : [ "obj-100", 0 ]
 				}
 
@@ -1526,7 +1518,7 @@
 			}
 , 			{
 				"patchline" : 				{
-					"destination" : [ "obj-42", 0 ],
+					"destination" : [ "obj-41", 0 ],
 					"source" : [ "obj-40", 0 ]
 				}
 
@@ -1808,7 +1800,7 @@
 			}
  ],
 		"dependency_cache" : [ 			{
-				"name" : "bball.mov",
+				"name" : "dishes.mov",
 				"bootpath" : "C74:/media/jitter",
 				"type" : "MooV",
 				"implicit" : 1
