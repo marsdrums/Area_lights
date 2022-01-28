@@ -76,28 +76,28 @@ void getLigthParams(inout light lig, vec3 P){
 			lig.pos 			= ligPos;
 			lig.front 		= ligDir;
 			lig.right 		= cross(ligDir, vec3(0., 1., 0.));
-			lig.up 			= cross(lig.right, ligDir);
+			lig.up 			= cross(lig.right, lig.front);
 			lig.halfWidth 	= ligWidth*0.5;
 			lig.halfHeight = ligHeight*0.5;
-	vec3 	right 			= ligPos + lig.halfWidth;
-	vec3 	up 				= ligPos + lig.halfHeight; 
-   		lig.p0 			= +right + up;
-   		lig.p1 			= -right + up;
-   		lig.p2 			= -right - up;
-   		lig.p3 			= +right - up;
-   		lig.p0_P 		= normalize(lig.p0 - P);
-   		lig.p1_P 		= normalize(lig.p1 - P);
-   		lig.p2_P 		= normalize(lig.p2 - P);
-   		lig.p3_P 		= normalize(lig.p3 - P);
-   		lig.pos_P 		= normalize(lig.pos - P);
+	vec3 	right 			= lig.right * lig.halfWidth;
+	vec3 	up 				= lig.up 	* lig.halfHeight; 
+   		lig.p0 			= ligPos + right + up;
+   		lig.p1 			= ligPos - right + up;
+   		lig.p2 			= ligPos - right - up;
+   		lig.p3 			= ligPos + right - up;
+   		lig.p0_P 		= lig.p0 - P;
+   		lig.p1_P 		= lig.p1 - P;
+   		lig.p2_P 		= lig.p2 - P;
+   		lig.p3_P 		= lig.p3 - P;
+   		lig.pos_P 		= lig.pos - P;
 }
 
-float rectSolidAngle(vec3 P, in light lig){
-    
-   vec3 		n0 = cross(lig.p0_P, lig.p1_P);
-   vec3 		n1 = cross(lig.p1_P, lig.p2_P);
-   vec3 		n2 = cross(lig.p2_P, lig.p3_P);
-   vec3 		n3 = cross(lig.p3_P, lig.p0_P);
+float rectSolidAngle(in light lig){
+
+   vec3 		n0 = normalize(cross(lig.p0_P, lig.p1_P));
+   vec3 		n1 = normalize(cross(lig.p1_P, lig.p2_P));
+   vec3 		n2 = normalize(cross(lig.p2_P, lig.p3_P));
+   vec3 		n3 = normalize(cross(lig.p3_P, lig.p0_P));
     
    float 	g0 = acos(dot(-n0, n1));
 	float 	g1 = acos(dot(-n1, n2));
@@ -112,23 +112,29 @@ vec3 rayPlaneIntersect(vec3 ro, vec3 rd, light lig)
 }
 float getDif(vec3 P, vec3 N, vec3 R, in light lig){
 
-	float 	solidAngle = rectSolidAngle(P, lig);
-
 	//mean of five point lights multiplied by the solid angle
-	return 	solidAngle * 0.2 * (
-			saturate ( dot( lig.p0_P, N ) )+
-			saturate ( dot( lig.p1_P, N ) )+
-			saturate ( dot( lig.p2_P, N ) )+
-			saturate ( dot( lig.p3_P, N ) )+
-			saturate ( dot( lig.pos_P, N ))
+	return 	rectSolidAngle(lig) * 0.2 * (
+			saturate ( dot( normalize(lig.p0_P), N ) )+
+			saturate ( dot( normalize(lig.p1_P), N ) )+
+			saturate ( dot( normalize(lig.p2_P), N ) )+
+			saturate ( dot( normalize(lig.p3_P), N ) )+
+			saturate ( dot( normalize(lig.pos_P), N ))
 			);
 
 }
 float getSpe(vec3 P, vec3 N, vec3 R, in light lig){
 
+	//SDF of the plane
+	//float	planeDist = dot(eye,lig.front) + dot(lig.pos, lig.front);
+	//float posDist = length(eye - P);
+	//if(posDist > planeDist){return 0.;}
+
     // calculate point on the rectangle surface/edge based on the ray originating from the shaded point
-    vec3 	planePointCenter 	= rayPlaneIntersect(P, R, lig) - lig.pos;
+    vec3 	planePointCenter 	= rayPlaneIntersect(P, R, lig);
+    //float  intersectionDist = length(planePointCenter - P);
+    //if(posDist < intersectionDist){return 0.;}
     // project point on the plane on which the rectangle lies
+    			planePointCenter -= lig.pos;
     vec2 	planePointProj 	= vec2(dot(planePointCenter, lig.right), dot(planePointCenter, lig.up));
     			planePointProj.x 	= clamp(planePointProj.x, -lig.halfWidth, lig.halfWidth);
     			planePointProj.y 	= clamp(planePointProj.y, -lig.halfHeight, lig.halfHeight);
