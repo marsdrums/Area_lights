@@ -5,6 +5,7 @@
 	<param name="M" type="mat4" state="WORLD_MATRIX" />
 	<param name="eye" type="vec3" state="CAMERA_POSITION" />
 	<param name="MVP" type="mat4" state="MODELVIEW_PROJECTION_MATRIX" />
+	<param name="ligTex" type="int" default="0" />
 
 	<param name="ligPos" type="vec3" default="0. 1. 0." />
 	<param name="ligDir" type="vec3" default="0. 0. 1." />
@@ -18,6 +19,7 @@
 		<bind param="M" program="vp" />
 		<bind param="MVP" program="vp" />
 		<bind param="eye" program="fp" />
+		<bind param="ligTex" program="fp" />
 
 		<bind param="ligPos" program="fp" />
 		<bind param="ligDir" program="fp" />
@@ -52,6 +54,7 @@ void main() {
 uniform vec3 eye, ligPos, ligDir, ligColor;
 uniform float ligWidth, ligHeight;
 uniform int twoSided;
+uniform sampler2D ligTex;
 
 struct light{
 	vec3 	pos; 
@@ -113,12 +116,12 @@ vec3 rayPlaneIntersect(vec3 ro, vec3 rd, light lig)
 vec3 getDif(vec3 P, vec3 N, vec3 R, in light lig){
 
 	//mean of five point lights multiplied by the solid angle
-	return 	lig.col*rectSolidAngle(lig) * 0.2 * (
-			saturate ( dot( normalize(lig.p0_P), N ) ) +
-			saturate ( dot( normalize(lig.p1_P), N ) ) +
-			saturate ( dot( normalize(lig.p2_P), N ) ) +
-			saturate ( dot( normalize(lig.p3_P), N ) ) +
-			saturate ( dot( normalize(lig.pos_P), N ))
+	return 	rectSolidAngle(lig) * 0.2 * (
+			saturate ( dot( normalize(lig.p0_P), N ) ) * textureLod(ligTex, vec2(0., 1.), length(lig.p0_P)).rgb +
+			saturate ( dot( normalize(lig.p1_P), N ) ) * textureLod(ligTex, vec2(1., 1.), length(lig.p1_P)).rgb +
+			saturate ( dot( normalize(lig.p2_P), N ) ) * textureLod(ligTex, vec2(1., 0.), length(lig.p2_P)).rgb +
+			saturate ( dot( normalize(lig.p3_P), N ) ) * textureLod(ligTex, vec2(0., 0.), length(lig.p3_P)).rgb +
+			saturate ( dot( normalize(lig.pos_P), N )) * textureLod(ligTex, vec2(0.5, 0.5), length(lig.pos_P)).rgb
 			);
 
 }
@@ -138,16 +141,20 @@ vec3 getSpe(vec3 P, vec3 N, vec3 R, in light lig){
     vec2 	planePointProj 	= vec2(dot(planePointCenter, lig.right), dot(planePointCenter, lig.up));
     			planePointProj.x 	= clamp(planePointProj.x, -lig.halfWidth, lig.halfWidth);
     			planePointProj.y 	= clamp(planePointProj.y, -lig.halfHeight, lig.halfHeight);
+    vec2		uv = planePointProj/vec2(ligWidth, ligHeight) + 0.5;
+    			//uv.y = 1. - uv.y;
+    			uv.x = 1. - uv.x;
 
     vec3 	L 						= lig.pos + lig.right*planePointProj.x + lig.up*planePointProj.y;  
 
     			L -= P; 
    vec3 	ligDir 	= normalize(L);
     float	ligDis 	= length(L);
+        vec3	col = textureLod(ligTex, uv, ligDis*2.).rgb;
     float 	spe 	= max(dot(ligDir, R), 0.);
 
     //return pow(spe, 200.)* (1./(ligDis*ligDis));
-	return lig.col*pow(spe, 200.)* (1./(ligDis*ligDis));
+	return pow(spe, 200.)*col* (1./(ligDis*ligDis));
     //return 	pow(spe, 20) * (smoothstep(0., 1., saturate(1. - abs((planePointProj.x/lig.halfWidth)))*4)*0.6 + 0.4)
     //					* (smoothstep(0., 1., saturate(1. - abs((planePointProj.y/lig.halfHeight)))*4)*0.6 + 0.4) * (1./(ligDis*ligDis));
 
@@ -160,7 +167,7 @@ vec3 getRectLight(in light lig, vec3 P, vec3 N, vec3 R){
    bool 		windingCheck = twoSided == 1 ? true : dot(lig.front, lig.pos - P) < 0.;
 	vec3 	dif = windingCheck ? getDif(P, N, R, lig) : vec3(0.);
 	vec3 	spe = windingCheck ? getSpe(P, N, R, lig) : vec3(0.);
-return mix(dif, spe, vec3(0.5));
+return lig.col * mix(dif, spe, vec3(0.5));
 	//return lig.col * mix(dif, spe, 0.5);
 }
 void main() {
