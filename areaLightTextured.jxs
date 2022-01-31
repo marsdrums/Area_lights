@@ -94,7 +94,6 @@ void getLigthParams(inout light lig, vec3 P){
    		lig.p3_P 		= lig.p3 - P;
    		lig.pos_P 		= lig.pos - P;
 }
-
 float rectSolidAngle(in light lig){
 
    vec3 		n0 = normalize(cross(lig.p0_P, lig.p1_P));
@@ -109,8 +108,8 @@ float rectSolidAngle(in light lig){
     
    return 	g0 + g1 + g2 + g3 - TWOPI;
 }
-vec3 rayPlaneIntersect(vec3 ro, vec3 rd, light lig)
-{
+vec3 rayPlaneIntersect(vec3 ro, vec3 rd, light lig){
+
    return ro + rd*(dot(lig.front, lig.pos - ro) / dot(lig.front, rd));
 }
 vec3 getDif(vec3 P, vec3 N, vec3 R, in light lig){
@@ -123,7 +122,6 @@ vec3 getDif(vec3 P, vec3 N, vec3 R, in light lig){
 			saturate ( dot( normalize(lig.p3_P), N ) ) * pow(textureLod(ligTex, vec2(0., 0.), length(lig.p3_P)).rgb, vec3(2.2)) +
 			saturate ( dot( normalize(lig.pos_P), N )) * pow(textureLod(ligTex, vec2(0.5, 0.5), length(lig.pos_P)).rgb, vec3(2.2))
 			);
-
 }
 vec3 getSpe(vec3 P, vec3 N, vec3 R, in light lig){
 
@@ -151,7 +149,6 @@ vec3 getSpe(vec3 P, vec3 N, vec3 R, in light lig){
    float 	spe 					= max(dot(ligDir, R), 0.);
 
 	return pow(spe, 200.)*col* (1./(1. + ligDis*ligDis));
-
 }
 vec3 getRectLight(in light lig, vec3 P, vec3 N, vec3 R){
 
@@ -161,7 +158,6 @@ vec3 getRectLight(in light lig, vec3 P, vec3 N, vec3 R){
 	vec3 	dif = windingCheck ? getDif(P, N, R, lig) : vec3(0.);
 	vec3 	spe = windingCheck ? getSpe(P, N, R, lig) : vec3(0.);
 	return lig.col * mix(dif, spe, 0.5);
-
 }
 void main() {
 //I'm trying the Frostbite implementation of a rectangular light
